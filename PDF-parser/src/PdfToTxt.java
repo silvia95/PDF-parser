@@ -1,4 +1,6 @@
 import java.awt.geom.Rectangle2D;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -45,10 +47,11 @@ public class PdfToTxt {
         PDFTextStripper pdfStripper = new PDFTextStripper();
         Map<Integer, List<String>> pages = new HashMap<>();
         Map<String, Integer> frequencies = new HashMap<>();
-        for (int i = 10; i < 20; i++) {
-//            for (int i = 0; i < pdDoc.getNumberOfPages(); i++) {
+        //for (int i = 10; i < 20; i++) {
+      for (int i = 0; i < pdDoc.getNumberOfPages(); i++) {
             pdfStripper.setStartPage(i);
             pdfStripper.setEndPage(i+1);
+            pdfStripper.setEndPage(i);
             String page = pdfStripper.getText(pdDoc);
             processPage(i, page, pages, frequencies);
         }
@@ -61,26 +64,15 @@ public class PdfToTxt {
         }
 
         return sb.toString();
+
     }
-
-    public String getTextByArea()  {
-        try(RandomAccessFile f = new RandomAccessFile(new File(filePath), "r")){
-            PDFParser parser = new PDFParser(f);
-            parser.parse();
-            return extractTextByArea(new PDDocument(parser.getDocument()), 22);
-        }catch (IOException e){
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-
 
     private void processPage(Integer i, String page, Map<Integer, List<String>> pages, Map<String, Integer> frequencies) {
         @SuppressWarnings("resource")
         Scanner scanner = new Scanner(page);
         List<String> lines = new ArrayList<>();
         List<String> regexp = createRegex();
+        System.out.println("-------Progessing page: "+ i);
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
             LineMatcher lineMatcher = checkLineMatches(regexp, line, i);
@@ -88,12 +80,17 @@ public class PdfToTxt {
                 lines.add(line);
                 continue;
             }
+            System.out.println(lineMatcher.getLine() + " 	 " + lineMatcher.getRegexp());
             Integer o = frequencies.get(lineMatcher.getRegexp());
-            int f = o==null? 0:o;
-            if(f>0){
+            int f = o == null ? 0:o;
+            if(f > 0){
                 frequencies.put(lineMatcher.getRegexp(), ++f);
             }else{
                 frequencies.put(lineMatcher.getRegexp(), 1);
+            }
+            String regexpr = lineMatcher.getRegexp();
+            if(f < 2 && regexpr == "([A-Z][a-z]* *)([a-zA-Z ]*)"){
+                lines.add(line);
             }
         }
         pages.put(i, lines);
@@ -104,17 +101,11 @@ public class PdfToTxt {
             Pattern pattern = Pattern.compile(regexp);
             Matcher matcher = pattern.matcher(line);
             if (matcher.matches()) {
+                System.out.println(line);
                 return new LineMatcher(line, regexp, matcher.group(), 1, pageNr);
             }
         }
         return null;
-    }
-
-    private String extractText(PDDocument pdDoc) throws IOException {
-        PDFTextStripper pdfStripper = new PDFTextStripper();
-        pdfStripper.setStartPage(44);
-        pdfStripper.setEndPage(46);
-        return pdfStripper.getText(pdDoc);
     }
 
     private List<String> createRegex() {
@@ -137,8 +128,8 @@ public class PdfToTxt {
         // 4.1.5.6 Index Test Test 415
         String titlePattern6 = "([1-9]((\\.)[0-9]*)+)(( [A-Z][A-Za-z]*)+)( [1-9][0-9]*)";
 
-        // Index test
-        String titlePattern7 = "([A-Z][a-z]* *)([a-zA-Z ]*)";
+        // INNDEX TEST or Index Test
+        String titlePattern7 = "([A-Z ]+)|(([A-Z][A-Za-z]* )+)";
 
         // Index test test 231
         String titlePattern8 = "([A-Z][a-z]* *)([a-zA-Z ]*)([1-9][0-9]*)";
@@ -158,6 +149,26 @@ public class PdfToTxt {
         // 234) test test
         String titlePattern13 = "([1-9][0-9]*\\))( *[a-zA-Z ]*)";
 
+        // Chapter 1: Test Test 412 or Chapter 1 Test Test 412 or Chapter 1. Test Test 412
+        String titlePattern14 = "([A-Z][A-Za-z]* *)([1-9][0-9]*: *|[1-9][0-9]*\\. *|[1-9][0-9]* *)(([A-Z][A-Za-z]* )+)([1-9][0-9]*)";
+
+        // 412 Chapter 1: Test Test
+        String titlePattern15 = "([1-9][0-9]* )([A-Z][A-Za-z]* *)([1-9][0-9]*: *|[1-9][0-9]*\\. *|[1-9][0-9]* *)(( [A-Z][A-Za-z]*)+)";
+
+        // Chapter 1: Test test test 412
+        String titlePattern16 = "([A-Z][A-Za-z]* *)([1-9][0-9]*: *|[1-9][0-9]*\\. *|[1-9][0-9]* *)([A-Z][a-z]* *)([a-zA-Z ]*)([1-9][0-9]*)";
+
+        // 412 Chapter 1: Test test
+        String titlePattern17 = "([1-9][0-9]* *)([A-Z][A-Za-z]* *)([1-9][0-9]*: *|[1-9][0-9]*\\. *|[1-9][0-9]* *)([A-Z][a-z]* *)([a-zA-Z ]*)";
+
+        // Chapter 1: Test Test
+        String titlePattern18 = "([A-Z][A-Za-z]* *)([1-9][0-9]*: *|[1-9][0-9]*\\. *|[1-9][0-9]* *)(( [A-Z][A-Za-z]*)+)";
+
+        // Chapter 1: Test test test
+        String titlePattern19 = "([A-Z][A-Za-z]* *)([1-9][0-9]*: *|[1-9][0-9]*\\. *|[1-9][0-9]* *)([A-Z][a-z]* *)([a-zA-Z ]*)";
+
+        // Test test test
+        String titlePattern20 = "([A-Z][a-z]* *)([a-zA-Z ]*)";
 
         regexList.add(titlePattern1);
         regexList.add(titlePattern2);
@@ -172,8 +183,32 @@ public class PdfToTxt {
         regexList.add(titlePattern11);
         regexList.add(titlePattern12);
         regexList.add(titlePattern13);
+        regexList.add(titlePattern14);
+        regexList.add(titlePattern15);
+        regexList.add(titlePattern16);
+        regexList.add(titlePattern17);
+        regexList.add(titlePattern18);
+        regexList.add(titlePattern19);
+        //regexList.add(titlePattern20);
 
         return regexList;
+    }
+    public String getTextByArea()  {
+        try(RandomAccessFile f = new RandomAccessFile(new File(filePath), "r")){
+            PDFParser parser = new PDFParser(f);
+            parser.parse();
+            return extractTextByArea(new PDDocument(parser.getDocument()), 22);
+        }catch (IOException e){
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String extractText(PDDocument pdDoc) throws IOException {
+        PDFTextStripper pdfStripper = new PDFTextStripper();
+        pdfStripper.setStartPage(44);
+        pdfStripper.setEndPage(46);
+        return pdfStripper.getText(pdDoc);
     }
 
     public String extractTextByArea(PDDocument pdDoc, int pageNumber) throws IOException {
@@ -189,11 +224,24 @@ public class PdfToTxt {
 
 
     public static void main(String[] args) throws IOException {
+        System.out.println("Introduceti calea catre documentul pdf e.g. pdf\\\\Mizerabilii.pdf ");
+        System.out.println();
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        String pdfName = br.readLine();
+
+        System.out.println("Calea catre fisier introdusa este: " + pdfName);
+        System.out.println();
+
+        System.out.println("----------------------------------------------------------");
+        System.out.println("Liniile eliminate din fisier sunt: ");
+        System.out.println();
+
         try (Writer writer = new BufferedWriter(
                 new OutputStreamWriter(new FileOutputStream("pdf\\txtFromPdf.txt"), StandardCharsets.UTF_8))) {
-            PdfToTxt pdfManager = new PdfToTxt("pdf\\CleanCode.pdf");
+            //PdfToTxt pdfManager = new PdfToTxt("pdf\\CleanCode.pdf");
+            PdfToTxt pdfManager = new PdfToTxt(pdfName);
             String text = pdfManager.getText();
-            System.out.println(text);
+            //System.out.println(text);
             writer.write(text);
         } catch (IOException ex) {
             Logger.getLogger(PdfToTxt.class.getName()).log(Level.SEVERE, "error", ex);
