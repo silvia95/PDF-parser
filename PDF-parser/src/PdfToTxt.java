@@ -50,7 +50,6 @@ public class PdfToTxt {
         //for (int i = 10; i < 20; i++) {
       for (int i = 0; i < pdDoc.getNumberOfPages(); i++) {
             pdfStripper.setStartPage(i);
-            pdfStripper.setEndPage(i+1);
             pdfStripper.setEndPage(i);
             String page = pdfStripper.getText(pdDoc);
             processPage(i, page, pages, frequencies);
